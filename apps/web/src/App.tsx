@@ -15,6 +15,7 @@ type Project = {
   status: "active" | "paused" | "archived";
   repoUrl: string;
   siteUrl: string;
+  updatedAt: string;
 };
 type Task = {
   id: string;
@@ -36,6 +37,7 @@ type Note = {
   kind: "note" | "doc" | "runbook" | "meeting" | "idea" | "postmortem" | "reference";
   contentMd: string;
   isPinned: boolean;
+  updatedAt: string;
 };
 
 const navigation = [
@@ -90,6 +92,8 @@ export function App() {
   const selectedProject = useMemo(() => projects.find((item) => item.slug === projectMatch?.params.slug) ?? null, [projectMatch?.params.slug, projects]);
   const projectTasks = selectedProject ? tasks.filter((item) => item.projectId === selectedProject.id) : [];
   const projectNotes = selectedProject ? notes.filter((item) => item.projectId === selectedProject.id) : [];
+  const taskCountByProject = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, tasks.filter((task) => task.projectId === project.id).length])), [projects, tasks]);
+  const noteCountByProject = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, notes.filter((note) => note.projectId === project.id).length])), [projects, notes]);
 
   async function loadData() {
     const [dashboardResponse, projectsResponse, tasksResponse, notesResponse] = await Promise.all([
@@ -141,6 +145,22 @@ export function App() {
       await requestJson("/api/auth/logout", { method: "POST" });
       setUser(null);
       navigate("/");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleProjectDelete(projectId: string) {
+    setErrorMessage(null);
+    setIsSubmitting(true);
+    try {
+      await requestJson(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (selectedProject?.id === projectId) {
+        navigate("/projects");
+      }
+      await loadData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Delete failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -232,9 +252,57 @@ export function App() {
         )}
 
         {location.pathname === "/projects" && (
-          <section className="split-layout">
+          <section className="stack-layout">
             <section className="panel">
-              <p className="eyebrow">Projects</p><h3>{editingProjectId ? "Edit project" : "New project"}</h3>
+              <div className="section-heading">
+                <div><p className="eyebrow">Projects</p><h3>All projects</h3></div>
+                <span className="muted">Click a project name to open its tasks table.</span>
+              </div>
+              <div className="table-shell">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Status</th>
+                      <th>Tasks</th>
+                      <th>Notes</th>
+                      <th>Repo</th>
+                      <th>Site</th>
+                      <th>Updated</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projects.map((project) => (
+                      <tr key={project.id}>
+                        <td>
+                          <button type="button" className="table-link" onClick={() => navigate(`/projects/${project.slug}`)}>
+                            {project.name}
+                          </button>
+                        </td>
+                        <td><span className={`status-pill status-${project.status}`}>{project.status}</span></td>
+                        <td>{taskCountByProject[project.id] ?? 0}</td>
+                        <td>{noteCountByProject[project.id] ?? 0}</td>
+                        <td>{project.repoUrl ? <a className="table-link" href={project.repoUrl} target="_blank" rel="noreferrer">repo</a> : <span className="muted">-</span>}</td>
+                        <td>{project.siteUrl ? <a className="table-link" href={project.siteUrl} target="_blank" rel="noreferrer">site</a> : <span className="muted">-</span>}</td>
+                        <td>{new Date(project.updatedAt).toLocaleDateString()}</td>
+                        <td>
+                          <div className="icon-actions">
+                            <button type="button" className="icon-button" title="Open" onClick={() => navigate(`/projects/${project.slug}`)}>↗</button>
+                            <button type="button" className="icon-button" title="Edit" onClick={() => { setEditingProjectId(project.id); setProjectForm({ name: project.name, slug: project.slug, description: project.description, color: project.color, status: project.status, repoUrl: project.repoUrl, siteUrl: project.siteUrl }); }}>✎</button>
+                            <button type="button" className="icon-button danger-button" title="Delete" onClick={() => { if (confirm(`Delete project ${project.name}?`)) { void handleProjectDelete(project.id); } }}>✕</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {projects.length === 0 ? <p className="muted empty-table">No projects yet.</p> : null}
+              </div>
+            </section>
+
+            <section className="panel">
+              <p className="eyebrow">Editor</p><h3>{editingProjectId ? "Edit project" : "New project"}</h3>
               <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingProjectId ? `/api/projects/${editingProjectId}` : "/api/projects", editingProjectId ? "PUT" : "POST", projectForm, () => { setProjectForm(initialProject); setEditingProjectId(null); }); }}>
                 <label>Name<input value={projectForm.name} onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))} required /></label>
                 <label>Slug<input value={projectForm.slug} onChange={(event) => setProjectForm((current) => ({ ...current, slug: event.target.value }))} /></label>
@@ -245,15 +313,17 @@ export function App() {
                 </div>
                 <label>Repo URL<input value={projectForm.repoUrl} onChange={(event) => setProjectForm((current) => ({ ...current, repoUrl: event.target.value }))} /></label>
                 <label>Site URL<input value={projectForm.siteUrl} onChange={(event) => setProjectForm((current) => ({ ...current, siteUrl: event.target.value }))} /></label>
-                <button type="submit" className="primary-button" disabled={isSubmitting}>{editingProjectId ? "Save project" : "Create project"}</button>
+                <div className="button-row">
+                  <button type="submit" className="primary-button" disabled={isSubmitting}>{editingProjectId ? "Save project" : "Create project"}</button>
+                  {editingProjectId ? <button type="button" className="ghost-button" onClick={() => { setEditingProjectId(null); setProjectForm(initialProject); }}>Cancel</button> : null}
+                </div>
               </form>
             </section>
-            <section className="panel"><p className="eyebrow">List</p><h3>All projects</h3><div className="entity-list">{projects.map((project) => <article className="entity-card" key={project.id}><div className="entity-title-row"><div className="entity-title-group"><span className="color-dot" style={{ backgroundColor: project.color }} /><div><h4>{project.name}</h4><p className="muted">{project.slug}</p></div></div><span className={`status-pill status-${project.status}`}>{project.status}</span></div><p className="muted">{project.description || "No description yet."}</p><div className="button-row"><button type="button" className="ghost-button" onClick={() => navigate(`/projects/${project.slug}`)}>Open</button><button type="button" className="ghost-button" onClick={() => { setEditingProjectId(project.id); setProjectForm({ name: project.name, slug: project.slug, description: project.description, color: project.color, status: project.status, repoUrl: project.repoUrl, siteUrl: project.siteUrl }); }}>Edit</button></div></article>)}{projects.length === 0 ? <p className="muted">No projects yet.</p> : null}</div></section>
           </section>
         )}
 
         {location.pathname === "/tasks" && (
-          <section className="split-layout">
+          <section className="stack-layout">
             <section className="panel"><p className="eyebrow">Tasks</p><h3>{editingTaskId ? "Edit task" : "New task"}</h3>
               <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingTaskId ? `/api/tasks/${editingTaskId}` : "/api/tasks", editingTaskId ? "PUT" : "POST", { ...taskForm, dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null }, () => { setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" }); setEditingTaskId(null); }); }}>
                 <label>Project<select value={taskForm.projectId} onChange={(event) => setTaskForm((current) => ({ ...current, projectId: event.target.value }))} required><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
@@ -268,7 +338,7 @@ export function App() {
                 <button type="submit" className="primary-button" disabled={isSubmitting}>{editingTaskId ? "Save task" : "Create task"}</button>
               </form>
             </section>
-            <section className="panel"><p className="eyebrow">Queue</p><h3>All tasks</h3><div className="entity-list">{tasks.map((task) => <article className="entity-card" key={task.id}><div className="entity-title-row"><div><h4>{task.title}</h4><p className="muted">{task.projectName ?? "Project"} · {task.kind}</p></div><span className={`status-pill status-${task.status}`}>{task.status}</span></div><p className="muted">{task.descriptionMd || "No description yet."}</p><div className="button-row"><button type="button" className="ghost-button" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>Edit</button></div></article>)}{tasks.length === 0 ? <p className="muted">No tasks yet.</p> : null}</div></section>
+            <section className="panel"><p className="eyebrow">Queue</p><h3>All tasks</h3><div className="table-shell"><table className="data-table"><thead><tr><th>Task</th><th>Project</th><th>Status</th><th>Priority</th><th>Kind</th><th>Due</th><th>Action</th></tr></thead><tbody>{tasks.map((task) => <tr key={task.id}><td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>{task.title}</button></td><td>{task.projectName ?? "-"}</td><td><span className={`status-pill status-${task.status}`}>{task.status}</span></td><td>{task.priority}</td><td>{task.kind}</td><td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}</td><td><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>✎</button></td></tr>)}</tbody></table>{tasks.length === 0 ? <p className="muted empty-table">No tasks yet.</p> : null}</div></section>
           </section>
         )}
 
@@ -289,10 +359,80 @@ export function App() {
         )}
 
         {projectMatch && (
-          <section className="detail-layout">
-            <section className="panel"><div className="entity-title-row"><div className="entity-title-group"><span className="color-dot large-dot" style={{ backgroundColor: selectedProject?.color ?? "#4d8eff" }} /><div><p className="eyebrow">Project detail</p><h3>{selectedProject?.name ?? "Project not found"}</h3></div></div>{selectedProject ? <span className={`status-pill status-${selectedProject.status}`}>{selectedProject.status}</span> : null}</div><p className="muted">{selectedProject?.description || "Choose an existing project from the list."}</p><div className="button-row">{selectedProject ? <><button type="button" className="ghost-button" onClick={() => navigate("/projects")}>Back to projects</button><button type="button" className="ghost-button" onClick={() => { setTaskForm({ ...initialTask, projectId: selectedProject.id }); navigate("/tasks"); }}>New task</button><button type="button" className="ghost-button" onClick={() => { setNoteForm({ ...initialNote, projectId: selectedProject.id }); navigate("/notes"); }}>New note</button></> : null}</div></section>
-            <section className="panel"><p className="eyebrow">Tasks</p><h3>Project queue</h3><div className="entity-list">{projectTasks.map((task) => <article className="entity-card" key={task.id}><div className="entity-title-row"><h4>{task.title}</h4><span className={`status-pill status-${task.status}`}>{task.status}</span></div><p className="muted">{task.descriptionMd || "No description yet."}</p></article>)}{selectedProject && projectTasks.length === 0 ? <p className="muted">No tasks for this project yet.</p> : null}</div></section>
-            <section className="panel"><p className="eyebrow">Notes</p><h3>Project docs</h3><div className="entity-list">{projectNotes.map((note) => <article className="entity-card" key={note.id}><div className="entity-title-row"><h4>{note.title}</h4>{note.isPinned ? <span className="status-pill status-active">pinned</span> : null}</div><p className="muted multiline-clamp">{note.contentMd || "No content yet."}</p></article>)}{selectedProject && projectNotes.length === 0 ? <p className="muted">No notes for this project yet.</p> : null}</div></section>
+          <section className="stack-layout">
+            <section className="panel">
+              <div className="section-heading">
+                <div className="entity-title-group">
+                  <span className="color-dot large-dot" style={{ backgroundColor: selectedProject?.color ?? "#4d8eff" }} />
+                  <div><p className="eyebrow">Project detail</p><h3>{selectedProject?.name ?? "Project not found"}</h3></div>
+                </div>
+                {selectedProject ? <span className={`status-pill status-${selectedProject.status}`}>{selectedProject.status}</span> : null}
+              </div>
+              <p className="muted">{selectedProject?.description || "Choose an existing project from the list."}</p>
+              <div className="button-row">
+                <button type="button" className="ghost-button" onClick={() => navigate("/projects")}>Back to projects</button>
+                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setTaskForm({ ...initialTask, projectId: selectedProject.id }); navigate("/tasks"); }}>New task</button> : null}
+                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setNoteForm({ ...initialNote, projectId: selectedProject.id }); navigate("/notes"); }}>New note</button> : null}
+              </div>
+            </section>
+
+            <section className="panel">
+              <p className="eyebrow">Tasks</p><h3>Project queue</h3>
+              <div className="table-shell">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Task</th>
+                      <th>Status</th>
+                      <th>Priority</th>
+                      <th>Kind</th>
+                      <th>Due</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectTasks.map((task) => (
+                      <tr key={task.id}>
+                        <td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>{task.title}</button></td>
+                        <td><span className={`status-pill status-${task.status}`}>{task.status}</span></td>
+                        <td>{task.priority}</td>
+                        <td>{task.kind}</td>
+                        <td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}</td>
+                        <td><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>↗</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {selectedProject && projectTasks.length === 0 ? <p className="muted empty-table">No tasks for this project yet.</p> : null}
+              </div>
+            </section>
+
+            <section className="panel">
+              <p className="eyebrow">Notes</p><h3>Project docs</h3>
+              <div className="table-shell">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Note</th>
+                      <th>Kind</th>
+                      <th>Pinned</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectNotes.map((note) => (
+                      <tr key={note.id}>
+                        <td>{note.title}</td>
+                        <td>{note.kind}</td>
+                        <td>{note.isPinned ? "Yes" : "No"}</td>
+                        <td>{new Date(note.updatedAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {selectedProject && projectNotes.length === 0 ? <p className="muted empty-table">No notes for this project yet.</p> : null}
+              </div>
+            </section>
           </section>
         )}
 

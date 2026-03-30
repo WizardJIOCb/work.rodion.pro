@@ -75,6 +75,16 @@ projectsRouter.put("/:id", async (request, response) => {
   return response.json({ project: updated });
 });
 
+projectsRouter.delete("/:id", async (request, response) => {
+  const [deleted] = await db.delete(projects).where(eq(projects.id, request.params.id)).returning();
+
+  if (!deleted) {
+    return response.status(404).json({ message: "Project not found." });
+  }
+
+  return response.status(204).send();
+});
+
 projectsRouter.get("/:slug", async (request, response) => {
   const [project] = await db.select().from(projects).where(eq(projects.slug, request.params.slug)).limit(1);
 
@@ -114,4 +124,3 @@ projectsRouter.get("/:slug", async (request, response) => {
     notes: noteItems,
   });
 });
-
