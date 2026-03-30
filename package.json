@@ -1,0 +1,15 @@
+{
+  "name": "work.rodion.pro",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.9.0",
+  "scripts": {
+    "dev": "corepack pnpm -r --parallel dev",
+    "build": "corepack pnpm -r build",
+    "check": "corepack pnpm -r typecheck",
+    "lint": "corepack pnpm -r lint",
+    "db:migrate": "corepack pnpm --filter @work-rodion/api db:migrate",
+    "db:seed-admin": "corepack pnpm --filter @work-rodion/api db:seed-admin",
+    "auth:hash-password": "corepack pnpm --filter @work-rodion/api auth:hash-password"
+  }
+}

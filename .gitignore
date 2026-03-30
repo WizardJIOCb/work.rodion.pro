@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+.turbo
+.cache
+.vite
+coverage
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+package-lock.json
+yarn.lock
+*.log
+work-rodion-deploy.tar.gz
+apps/web/src/*.js
