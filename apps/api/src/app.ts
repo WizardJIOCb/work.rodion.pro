@@ -3,6 +3,9 @@ import express from "express";
 import { env } from "./config/env.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes.js";
+import { notesRouter } from "./modules/notes/notes.routes.js";
+import { projectsRouter } from "./modules/projects/projects.routes.js";
+import { tasksRouter } from "./modules/tasks/tasks.routes.js";
 
 export const app = express();
 
@@ -31,3 +34,6 @@ app.get("/api", (_request, response) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/projects", projectsRouter);
+app.use("/api/tasks", tasksRouter);
+app.use("/api/notes", notesRouter);
