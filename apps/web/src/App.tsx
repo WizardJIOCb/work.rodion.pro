@@ -87,6 +87,9 @@ export function App() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteSearch, setNoteSearch] = useState("");
+  const [noteKindFilter, setNoteKindFilter] = useState<Note["kind"] | "all">("all");
+  const [previewNoteId, setPreviewNoteId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,6 +99,30 @@ export function App() {
   const projectNotes = selectedProject ? notes.filter((item) => item.projectId === selectedProject.id) : [];
   const taskCountByProject = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, tasks.filter((task) => task.projectId === project.id).length])), [projects, tasks]);
   const noteCountByProject = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, notes.filter((note) => note.projectId === project.id).length])), [projects, notes]);
+  const filteredNotes = useMemo(() => {
+    const search = noteSearch.trim().toLowerCase();
+    return [...notes]
+      .filter((note) => (noteKindFilter === "all" ? true : note.kind === noteKindFilter))
+      .filter((note) => {
+        if (!search) return true;
+        return (
+          note.title.toLowerCase().includes(search) ||
+          note.slug.toLowerCase().includes(search) ||
+          note.contentMd.toLowerCase().includes(search) ||
+          (note.projectName ?? "").toLowerCase().includes(search)
+        );
+      })
+      .sort((left, right) => {
+        if (left.isPinned !== right.isPinned) return left.isPinned ? -1 : 1;
+        return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+      });
+  }, [noteKindFilter, noteSearch, notes]);
+  const previewNote = useMemo(() => {
+    if (previewNoteId) {
+      return filteredNotes.find((note) => note.id === previewNoteId) ?? filteredNotes[0] ?? null;
+    }
+    return filteredNotes[0] ?? null;
+  }, [filteredNotes, previewNoteId]);
 
   async function loadData() {
     const [dashboardResponse, projectsResponse, tasksResponse, notesResponse] = await Promise.all([
@@ -403,32 +430,66 @@ export function App() {
                 <div><p className="eyebrow">Library</p><h3>All notes</h3></div>
                 <button type="button" className="primary-button plus-button" onClick={() => { setShowNoteForm(true); setEditingNoteId(null); setNoteForm({ ...initialNote, projectId: selectedProject?.id ?? "" }); }}>+</button>
               </div>
-              <div className="table-shell">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      <th>Project</th>
-                      <th>Kind</th>
-                      <th>Pinned</th>
-                      <th>Updated</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {notes.map((note) => (
-                      <tr key={note.id}>
-                        <td><button type="button" className="table-link" onClick={() => { setShowNoteForm(true); setEditingNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>{note.title}</button></td>
-                        <td>{note.projectName ?? "-"}</td>
-                        <td>{note.kind}</td>
-                        <td>{note.isPinned ? "Yes" : "No"}</td>
-                        <td>{new Date(note.updatedAt).toLocaleDateString()}</td>
-                        <td><button type="button" className="icon-button" title="Edit note" onClick={() => { setShowNoteForm(true); setEditingNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>✎</button></td>
+              <div className="toolbar-row">
+                <input
+                  value={noteSearch}
+                  onChange={(event) => setNoteSearch(event.target.value)}
+                  placeholder="Search title, project, slug or content"
+                />
+                <select
+                  value={noteKindFilter}
+                  onChange={(event) => setNoteKindFilter(event.target.value as Note["kind"] | "all")}
+                >
+                  <option value="all">all kinds</option>
+                  <option value="note">note</option>
+                  <option value="doc">doc</option>
+                  <option value="runbook">runbook</option>
+                  <option value="meeting">meeting</option>
+                  <option value="idea">idea</option>
+                  <option value="postmortem">postmortem</option>
+                  <option value="reference">reference</option>
+                </select>
+              </div>
+              <div className="notes-workspace">
+                <div className="table-shell">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Project</th>
+                        <th>Kind</th>
+                        <th>Pinned</th>
+                        <th>Updated</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {notes.length === 0 ? <p className="muted empty-table">No notes yet.</p> : null}
+                    </thead>
+                    <tbody>
+                      {filteredNotes.map((note) => (
+                        <tr key={note.id} className={previewNote?.id === note.id ? "selected-row" : ""}>
+                          <td><button type="button" className="table-link" onClick={() => setPreviewNoteId(note.id)}>{note.title}</button></td>
+                          <td>{note.projectName ?? "-"}</td>
+                          <td>{note.kind}</td>
+                          <td>{note.isPinned ? "Yes" : "No"}</td>
+                          <td>{new Date(note.updatedAt).toLocaleDateString()}</td>
+                          <td><div className="icon-actions"><button type="button" className="icon-button" title="Preview note" onClick={() => setPreviewNoteId(note.id)}>↗</button><button type="button" className="icon-button" title="Edit note" onClick={() => { setShowNoteForm(true); setEditingNoteId(note.id); setPreviewNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>✎</button></div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredNotes.length === 0 ? <p className="muted empty-table">No notes match your filters.</p> : null}
+                </div>
+                <aside className="panel note-preview-panel">
+                  <p className="eyebrow">Preview</p>
+                  <h3>{previewNote?.title ?? "No note selected"}</h3>
+                  {previewNote ? (
+                    <>
+                      <p className="muted">Project: {previewNote.projectName ?? "-"} · {previewNote.kind} · {previewNote.isPinned ? "Pinned" : "Regular"}</p>
+                      <pre className="note-preview-content">{previewNote.contentMd || "No content yet."}</pre>
+                    </>
+                  ) : (
+                    <p className="muted">Choose a note from the table to preview it here.</p>
+                  )}
+                </aside>
               </div>
             </section>
           </section>
