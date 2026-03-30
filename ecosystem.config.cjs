@@ -8,8 +8,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3010,
-        APP_URL: "http://work.rodion.pro",
-        API_URL: "http://work.rodion.pro/api",
+        APP_URL: "https://work.rodion.pro",
+        API_URL: "https://work.rodion.pro/api",
       },
     },
   ],

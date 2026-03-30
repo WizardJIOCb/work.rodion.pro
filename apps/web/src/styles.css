@@ -414,6 +414,10 @@ input {
   overflow-x: auto;
 }
 
+.accent-row td:first-child {
+  box-shadow: inset 4px 0 0 var(--accent-color, #4d8eff);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -463,6 +467,10 @@ input {
 
 .danger-button {
   color: #ffb4b4;
+}
+
+.project-panel-accent {
+  border-left: 4px solid var(--accent-color, #4d8eff);
 }
 
 .empty-table {

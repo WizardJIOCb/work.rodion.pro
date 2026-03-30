@@ -239,9 +239,11 @@ export function App() {
 
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
 
-        <section className="metrics-grid">
-          {cards.map((card) => <article className="card metric-card" key={card.key}><p className="metric-label">{card.title}</p><strong>{dashboard?.summary[card.key] ?? 0}</strong></article>)}
-        </section>
+        {!projectMatch && (
+          <section className="metrics-grid">
+            {cards.map((card) => <article className="card metric-card" key={card.key}><p className="metric-label">{card.title}</p><strong>{dashboard?.summary[card.key] ?? 0}</strong></article>)}
+          </section>
+        )}
 
         {location.pathname === "/" && (
           <section className="card-grid">
@@ -274,7 +276,7 @@ export function App() {
                   </thead>
                   <tbody>
                     {projects.map((project) => (
-                      <tr key={project.id}>
+                      <tr key={project.id} className="accent-row" style={{ ["--accent-color" as string]: project.color }}>
                         <td>
                           <button type="button" className="table-link" onClick={() => navigate(`/projects/${project.slug}`)}>
                             {project.name}
@@ -301,7 +303,7 @@ export function App() {
               </div>
             </section>
 
-            <section className="panel">
+            <section className="panel project-panel-accent" style={{ ["--accent-color" as string]: selectedProject?.color ?? "#4d8eff" }}>
               <p className="eyebrow">Editor</p><h3>{editingProjectId ? "Edit project" : "New project"}</h3>
               <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingProjectId ? `/api/projects/${editingProjectId}` : "/api/projects", editingProjectId ? "PUT" : "POST", projectForm, () => { setProjectForm(initialProject); setEditingProjectId(null); }); }}>
                 <label>Name<input value={projectForm.name} onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))} required /></label>
