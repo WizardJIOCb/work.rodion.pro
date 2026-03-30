@@ -85,6 +85,8 @@ export function App() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showNoteForm, setShowNoteForm] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -157,6 +159,24 @@ export function App() {
       await requestJson(`/api/projects/${projectId}`, { method: "DELETE" });
       if (selectedProject?.id === projectId) {
         navigate("/projects");
+      }
+      await loadData();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Delete failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleTaskDelete(taskId: string) {
+    setErrorMessage(null);
+    setIsSubmitting(true);
+    try {
+      await requestJson(`/api/tasks/${taskId}`, { method: "DELETE" });
+      if (editingTaskId === taskId) {
+        setEditingTaskId(null);
+        setShowTaskForm(false);
+        setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" });
       }
       await loadData();
     } catch (error) {
@@ -326,37 +346,91 @@ export function App() {
 
         {location.pathname === "/tasks" && (
           <section className="stack-layout">
-            <section className="panel"><p className="eyebrow">Tasks</p><h3>{editingTaskId ? "Edit task" : "New task"}</h3>
-              <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingTaskId ? `/api/tasks/${editingTaskId}` : "/api/tasks", editingTaskId ? "PUT" : "POST", { ...taskForm, dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null }, () => { setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" }); setEditingTaskId(null); }); }}>
-                <label>Project<select value={taskForm.projectId} onChange={(event) => setTaskForm((current) => ({ ...current, projectId: event.target.value }))} required><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-                <label>Title<input value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} required /></label>
-                <label>Description<textarea rows={5} value={taskForm.descriptionMd} onChange={(event) => setTaskForm((current) => ({ ...current, descriptionMd: event.target.value }))} /></label>
-                <div className="form-row three-col">
-                  <label>Status<select value={taskForm.status} onChange={(event) => setTaskForm((current) => ({ ...current, status: event.target.value as Task["status"] }))}><option value="todo">todo</option><option value="doing">doing</option><option value="blocked">blocked</option><option value="done">done</option><option value="cancelled">cancelled</option></select></label>
-                  <label>Priority<select value={taskForm.priority} onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as Task["priority"] }))}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="critical">critical</option></select></label>
-                  <label>Kind<select value={taskForm.kind} onChange={(event) => setTaskForm((current) => ({ ...current, kind: event.target.value as Task["kind"] }))}><option value="feature">feature</option><option value="bug">bug</option><option value="ops">ops</option><option value="research">research</option><option value="idea">idea</option><option value="content">content</option><option value="other">other</option></select></label>
+            {showTaskForm && (
+              <section className="panel">
+                <div className="section-heading">
+                  <div><p className="eyebrow">Tasks</p><h3>{editingTaskId ? "Edit task" : "New task"}</h3></div>
+                  <button type="button" className="ghost-button" onClick={() => { setShowTaskForm(false); setEditingTaskId(null); setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" }); }}>
+                    Back to list
+                  </button>
                 </div>
-                <label>Due date<input type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))} /></label>
-                <button type="submit" className="primary-button" disabled={isSubmitting}>{editingTaskId ? "Save task" : "Create task"}</button>
-              </form>
+                <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingTaskId ? `/api/tasks/${editingTaskId}` : "/api/tasks", editingTaskId ? "PUT" : "POST", { ...taskForm, dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null }, () => { setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" }); setEditingTaskId(null); setShowTaskForm(false); }); }}>
+                  <label>Project<select value={taskForm.projectId} onChange={(event) => setTaskForm((current) => ({ ...current, projectId: event.target.value }))} required><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+                  <label>Title<input value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} required /></label>
+                  <label>Description<textarea rows={5} value={taskForm.descriptionMd} onChange={(event) => setTaskForm((current) => ({ ...current, descriptionMd: event.target.value }))} /></label>
+                  <div className="form-row three-col">
+                    <label>Status<select value={taskForm.status} onChange={(event) => setTaskForm((current) => ({ ...current, status: event.target.value as Task["status"] }))}><option value="todo">todo</option><option value="doing">doing</option><option value="blocked">blocked</option><option value="done">done</option><option value="cancelled">cancelled</option></select></label>
+                    <label>Priority<select value={taskForm.priority} onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as Task["priority"] }))}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="critical">critical</option></select></label>
+                    <label>Kind<select value={taskForm.kind} onChange={(event) => setTaskForm((current) => ({ ...current, kind: event.target.value as Task["kind"] }))}><option value="feature">feature</option><option value="bug">bug</option><option value="ops">ops</option><option value="research">research</option><option value="idea">idea</option><option value="content">content</option><option value="other">other</option></select></label>
+                  </div>
+                  <label>Due date<input type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))} /></label>
+                  <button type="submit" className="primary-button" disabled={isSubmitting}>{editingTaskId ? "Save task" : "Create task"}</button>
+                </form>
+              </section>
+            )}
+            <section className="panel">
+              <div className="section-heading">
+                <div><p className="eyebrow">Queue</p><h3>All tasks</h3></div>
+                <button type="button" className="primary-button plus-button" onClick={() => { setShowTaskForm(true); setEditingTaskId(null); setTaskForm({ ...initialTask, projectId: selectedProject?.id ?? "" }); }}>+</button>
+              </div>
+              <div className="table-shell"><table className="data-table"><thead><tr><th>Task</th><th>Project</th><th>Status</th><th>Priority</th><th>Kind</th><th>Due</th><th>Actions</th></tr></thead><tbody>{tasks.map((task) => <tr key={task.id}><td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setShowTaskForm(true); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>{task.title}</button></td><td>{task.projectName ?? "-"}</td><td><span className={`status-pill status-${task.status}`}>{task.status}</span></td><td>{task.priority}</td><td>{task.kind}</td><td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}</td><td><div className="icon-actions"><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setShowTaskForm(true); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>✎</button><button type="button" className="icon-button danger-button" title="Delete task" onClick={() => { if (confirm(`Delete task ${task.title}?`)) { void handleTaskDelete(task.id); } }}>✕</button></div></td></tr>)}</tbody></table>{tasks.length === 0 ? <p className="muted empty-table">No tasks yet.</p> : null}</div>
             </section>
-            <section className="panel"><p className="eyebrow">Queue</p><h3>All tasks</h3><div className="table-shell"><table className="data-table"><thead><tr><th>Task</th><th>Project</th><th>Status</th><th>Priority</th><th>Kind</th><th>Due</th><th>Action</th></tr></thead><tbody>{tasks.map((task) => <tr key={task.id}><td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>{task.title}</button></td><td>{task.projectName ?? "-"}</td><td><span className={`status-pill status-${task.status}`}>{task.status}</span></td><td>{task.priority}</td><td>{task.kind}</td><td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}</td><td><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); }}>✎</button></td></tr>)}</tbody></table>{tasks.length === 0 ? <p className="muted empty-table">No tasks yet.</p> : null}</div></section>
           </section>
         )}
 
         {location.pathname === "/notes" && (
-          <section className="split-layout">
-            <section className="panel"><p className="eyebrow">Notes</p><h3>{editingNoteId ? "Edit note" : "New note"}</h3>
-              <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingNoteId ? `/api/notes/${editingNoteId}` : "/api/notes", editingNoteId ? "PUT" : "POST", noteForm, () => { setNoteForm({ ...initialNote, projectId: selectedProject?.id ?? "" }); setEditingNoteId(null); }); }}>
-                <label>Project<select value={noteForm.projectId} onChange={(event) => setNoteForm((current) => ({ ...current, projectId: event.target.value }))} required><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-                <label>Title<input value={noteForm.title} onChange={(event) => setNoteForm((current) => ({ ...current, title: event.target.value }))} required /></label>
-                <div className="form-row"><label>Slug<input value={noteForm.slug} onChange={(event) => setNoteForm((current) => ({ ...current, slug: event.target.value }))} /></label><label>Kind<select value={noteForm.kind} onChange={(event) => setNoteForm((current) => ({ ...current, kind: event.target.value as Note["kind"] }))}><option value="note">note</option><option value="doc">doc</option><option value="runbook">runbook</option><option value="meeting">meeting</option><option value="idea">idea</option><option value="postmortem">postmortem</option><option value="reference">reference</option></select></label></div>
-                <label className="checkbox-row"><input type="checkbox" checked={noteForm.isPinned} onChange={(event) => setNoteForm((current) => ({ ...current, isPinned: event.target.checked }))} />Pin this note</label>
-                <label>Content<textarea rows={10} value={noteForm.contentMd} onChange={(event) => setNoteForm((current) => ({ ...current, contentMd: event.target.value }))} /></label>
-                <button type="submit" className="primary-button" disabled={isSubmitting}>{editingNoteId ? "Save note" : "Create note"}</button>
-              </form>
+          <section className="stack-layout">
+            {showNoteForm && (
+              <section className="panel">
+                <div className="section-heading">
+                  <div><p className="eyebrow">Notes</p><h3>{editingNoteId ? "Edit note" : "New note"}</h3></div>
+                  <button type="button" className="ghost-button" onClick={() => { setShowNoteForm(false); setEditingNoteId(null); setNoteForm({ ...initialNote, projectId: selectedProject?.id ?? "" }); }}>
+                    Back to list
+                  </button>
+                </div>
+                <form className="stack-form" onSubmit={(event) => { event.preventDefault(); void saveEntity(editingNoteId ? `/api/notes/${editingNoteId}` : "/api/notes", editingNoteId ? "PUT" : "POST", noteForm, () => { setNoteForm({ ...initialNote, projectId: selectedProject?.id ?? "" }); setEditingNoteId(null); setShowNoteForm(false); }); }}>
+                  <label>Project<select value={noteForm.projectId} onChange={(event) => setNoteForm((current) => ({ ...current, projectId: event.target.value }))} required><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+                  <label>Title<input value={noteForm.title} onChange={(event) => setNoteForm((current) => ({ ...current, title: event.target.value }))} required /></label>
+                  <div className="form-row"><label>Slug<input value={noteForm.slug} onChange={(event) => setNoteForm((current) => ({ ...current, slug: event.target.value }))} /></label><label>Kind<select value={noteForm.kind} onChange={(event) => setNoteForm((current) => ({ ...current, kind: event.target.value as Note["kind"] }))}><option value="note">note</option><option value="doc">doc</option><option value="runbook">runbook</option><option value="meeting">meeting</option><option value="idea">idea</option><option value="postmortem">postmortem</option><option value="reference">reference</option></select></label></div>
+                  <label className="checkbox-row"><input type="checkbox" checked={noteForm.isPinned} onChange={(event) => setNoteForm((current) => ({ ...current, isPinned: event.target.checked }))} />Pin this note</label>
+                  <label>Content<textarea rows={10} value={noteForm.contentMd} onChange={(event) => setNoteForm((current) => ({ ...current, contentMd: event.target.value }))} /></label>
+                  <button type="submit" className="primary-button" disabled={isSubmitting}>{editingNoteId ? "Save note" : "Create note"}</button>
+                </form>
+              </section>
+            )}
+            <section className="panel">
+              <div className="section-heading">
+                <div><p className="eyebrow">Library</p><h3>All notes</h3></div>
+                <button type="button" className="primary-button plus-button" onClick={() => { setShowNoteForm(true); setEditingNoteId(null); setNoteForm({ ...initialNote, projectId: selectedProject?.id ?? "" }); }}>+</button>
+              </div>
+              <div className="table-shell">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Project</th>
+                      <th>Kind</th>
+                      <th>Pinned</th>
+                      <th>Updated</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {notes.map((note) => (
+                      <tr key={note.id}>
+                        <td><button type="button" className="table-link" onClick={() => { setShowNoteForm(true); setEditingNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>{note.title}</button></td>
+                        <td>{note.projectName ?? "-"}</td>
+                        <td>{note.kind}</td>
+                        <td>{note.isPinned ? "Yes" : "No"}</td>
+                        <td>{new Date(note.updatedAt).toLocaleDateString()}</td>
+                        <td><button type="button" className="icon-button" title="Edit note" onClick={() => { setShowNoteForm(true); setEditingNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>✎</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {notes.length === 0 ? <p className="muted empty-table">No notes yet.</p> : null}
+              </div>
             </section>
-            <section className="panel"><p className="eyebrow">Library</p><h3>All notes</h3><div className="entity-list">{notes.map((note) => <article className="entity-card" key={note.id}><div className="entity-title-row"><div><h4>{note.title}</h4><p className="muted">{note.projectName ?? "Project"} · {note.kind}</p></div>{note.isPinned ? <span className="status-pill status-active">pinned</span> : null}</div><p className="muted multiline-clamp">{note.contentMd || "No content yet."}</p><div className="button-row"><button type="button" className="ghost-button" onClick={() => { setEditingNoteId(note.id); setNoteForm({ projectId: note.projectId, title: note.title, slug: note.slug, kind: note.kind, contentMd: note.contentMd, isPinned: note.isPinned }); }}>Edit</button></div></article>)}{notes.length === 0 ? <p className="muted">No notes yet.</p> : null}</div></section>
           </section>
         )}
 
@@ -373,8 +447,8 @@ export function App() {
               <p className="muted">{selectedProject?.description || "Choose an existing project from the list."}</p>
               <div className="button-row">
                 <button type="button" className="ghost-button" onClick={() => navigate("/projects")}>Back to projects</button>
-                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setTaskForm({ ...initialTask, projectId: selectedProject.id }); navigate("/tasks"); }}>New task</button> : null}
-                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setNoteForm({ ...initialNote, projectId: selectedProject.id }); navigate("/notes"); }}>New note</button> : null}
+                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setShowTaskForm(true); setTaskForm({ ...initialTask, projectId: selectedProject.id }); navigate("/tasks"); }}>New task</button> : null}
+                {selectedProject ? <button type="button" className="ghost-button" onClick={() => { setShowNoteForm(true); setNoteForm({ ...initialNote, projectId: selectedProject.id }); navigate("/notes"); }}>New note</button> : null}
               </div>
             </section>
 
@@ -395,12 +469,12 @@ export function App() {
                   <tbody>
                     {projectTasks.map((task) => (
                       <tr key={task.id}>
-                        <td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>{task.title}</button></td>
+                        <td><button type="button" className="table-link" onClick={() => { setEditingTaskId(task.id); setShowTaskForm(true); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>{task.title}</button></td>
                         <td><span className={`status-pill status-${task.status}`}>{task.status}</span></td>
                         <td>{task.priority}</td>
                         <td>{task.kind}</td>
                         <td>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}</td>
-                        <td><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>↗</button></td>
+                        <td><button type="button" className="icon-button" title="Edit task" onClick={() => { setEditingTaskId(task.id); setShowTaskForm(true); setTaskForm({ projectId: task.projectId, title: task.title, descriptionMd: task.descriptionMd, status: task.status, priority: task.priority, kind: task.kind, dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "" }); navigate("/tasks"); }}>↗</button></td>
                       </tr>
                     ))}
                   </tbody>

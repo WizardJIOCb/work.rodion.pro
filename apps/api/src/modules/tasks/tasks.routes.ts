@@ -109,3 +109,12 @@ tasksRouter.put("/:id", async (request, response) => {
   return response.json({ task: updated });
 });
 
+tasksRouter.delete("/:id", async (request, response) => {
+  const [deleted] = await db.delete(tasks).where(eq(tasks.id, request.params.id)).returning();
+
+  if (!deleted) {
+    return response.status(404).json({ message: "Task not found." });
+  }
+
+  return response.status(204).send();
+});

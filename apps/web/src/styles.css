@@ -469,6 +469,15 @@ input {
   color: #ffb4b4;
 }
 
+.plus-button {
+  min-width: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
 .project-panel-accent {
   border-left: 4px solid var(--accent-color, #4d8eff);
 }
