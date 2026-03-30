@@ -12,7 +12,7 @@ const envCandidates = [
 const envPath = envCandidates.find((candidate) => existsSync(candidate));
 
 if (envPath) {
-  loadDotenv({ path: envPath });
+  loadDotenv({ path: envPath, override: true });
 }
 
 const envSchema = z.object({
